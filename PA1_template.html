@@ -1,0 +1,131 @@
+Peer Assesment 1
+Julio Matarrita,
+
+Sunday, June 14, 2015
+
+Loading packages adn set working directory
+setwd("C:/Users/Julio Matarrita/Dropbox/ReproducibleResearch")
+library(data.table)
+## Warning: package 'data.table' was built under R version 3.1.2
+library(ggplot2)
+## Warning: package 'ggplot2' was built under R version 3.1.3
+Loading and preprocessing the data.
+Load the data
+
+The following statement is used to load the data.
+
+Nota: It is assumen that the file activity.csv is the current working directory.
+
+activity <- read.table("activity.csv", header=TRUE,sep=",",dec=".")
+Tidy data
+
+activity$date <- as.Date(activity$date, format = "%Y-%m-%d")
+activity$interval <- as.factor(activity$interval)
+Check the data
+
+str(activity)
+## 'data.frame':    17568 obs. of  3 variables:
+##  $ steps   : int  NA NA NA NA NA NA NA NA NA NA ...
+##  $ date    : Date, format: "2012-10-01" "2012-10-01" ...
+##  $ interval: Factor w/ 288 levels "0","5","10","15",..: 1 2 3 4 5 6 7 8 9 10 ...
+What is mean total number of steps taken per day?
+Calculate the total number of steps taken per day
+For this part of the assignment, I ignore the missing values in the datase
+
+steps_per_day <- aggregate(steps ~ date, activity, sum)
+colnames(steps_per_day) <- c("date","steps")
+head(steps_per_day)
+##         date steps
+## 1 2012-10-02   126
+## 2 2012-10-03 11352
+## 3 2012-10-04 12116
+## 4 2012-10-05 13294
+## 5 2012-10-06 15420
+## 6 2012-10-07 11015
+If you do not understand the difference between a histogram and a barplot, research the difference between them. Make a histogram of the total number of steps taken each day.
+ggplot(steps_per_day, aes(x = steps)) + geom_histogram(fill = "blue", binwidth = 1000) + labs(title="Histogram of Steps Taken per Day", x = "Number of Steps per Day", y = "Number of times in a day(Count)") + theme_bw() 
+
+
+Calculate and report the mean and median of the total number of steps taken per day
+steps_mean   <- mean(steps_per_day$steps, na.rm=TRUE)
+steps_median <- median(steps_per_day$steps, na.rm=TRUE)
+What is the average daily activity pattern?
+We calculate the aggregation of steps by intervals of 5-minutes and convert the intervals as integers and save them in a data frame called steps_per_interval.
+
+steps_per_interval <- aggregate(activity$steps, by = list(interval = activity$interval),                   FUN=mean, na.rm=TRUE)
+#convert to integers
+##this helps in plotting
+steps_per_interval$interval <- as.integer(levels(steps_per_interval$interval)[steps_per_interval$interval])
+colnames(steps_per_interval) <- c("interval", "steps")
+Make a time series plot (i.e. type = “l”) of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+ggplot(steps_per_interval, aes(x=interval, y=steps)) + geom_line(color="green", size=1) +   labs(title="Average Daily Activity Pattern", x="Interval", y="Number of steps") + theme_bw()
+
+
+Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+max_interval <- steps_per_interval[which.max(steps_per_interval$steps),]
+Imputing missing values
+Note that there are a number of days/intervals where there are missing values (coded as NA). The presence of missing days may introduce bias into some calculations or summaries of the data.
+
+Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+missing_vals <- sum(is.na(activity$steps))
+Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.
+To populate missing values, we choose to replace them with the mean value at the same interval across days. In most of the cases the median is a better centrality measure than mean, but in our case the total median is not much far away from total mean, and probably we can make the mean and median meets.
+
+We create a function na_fill(data, pervalue) which the data arguement is the rdata data frame and pervalue arguement is the steps_per_interval data frame.
+
+Create a new dataset that is equal to the original dataset but with the missing data filled in.
+na_fill <- function(data, pervalue) {
+        na_index <- which(is.na(data$steps))
+        na_replace <- unlist(lapply(na_index, FUN=function(idx){
+                interval = data[idx,]$interval
+                pervalue[pervalue$interval == interval,]$steps
+        }))
+        fill_steps <- data$steps
+        fill_steps[na_index] <- na_replace
+        fill_steps
+}
+
+activity_fill <- data.frame(  
+        steps = na_fill(activity, steps_per_interval),  
+        date = activity$date,  
+        interval = activity$interval)
+str(activity_fill)
+## 'data.frame':    17568 obs. of  3 variables:
+##  $ steps   : num  1.717 0.3396 0.1321 0.1509 0.0755 ...
+##  $ date    : Date, format: "2012-10-01" "2012-10-01" ...
+##  $ interval: Factor w/ 288 levels "0","5","10","15",..: 1 2 3 4 5 6 7 8 9 10 ...
+We check that are there any missing values remaining or not
+
+sum(is.na(activity_fill$steps))
+## [1] 0
+Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+Now let us plot a histogram of the daily total number of steps taken, plotted with a bin interval of 1000 steps, after filling missing values.
+
+fill_steps_per_day <- aggregate(steps ~ date, activity_fill, sum)
+colnames(fill_steps_per_day) <- c("date","steps")
+
+##plotting the histogram
+ggplot(fill_steps_per_day, aes(x = steps)) + geom_histogram(fill = "orange", binwidth = 1000) +  labs(title="Histogram of Steps Taken per Day", x = "Number of Steps per Day", y = "Number of times in a day(Count)") + theme_bw() 
+
+
+Calculate and report the mean and median total number of steps taken per day.
+
+steps_mean_fill   <- mean(fill_steps_per_day$steps, na.rm=TRUE)
+steps_median_fill <- median(fill_steps_per_day$steps, na.rm=TRUE)
+Do these values differ from the estimates from the first part of the assignment?
+
+Yes, these values do differ slightly.
+
+Before filling the data
+
+Mean : 10766.189 Median: 10765 After filling the data
+
+Mean : 10766.189 Median: 10766.189 We see that the values after filling the data mean and median are equal.
+
+What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+As you can see, comparing with the calculations done in the first section of this document, we observe that while the mean value remains unchanged, the median value has shifted and virtual matches to the mean.
+
+Since our data has shown a t-student distribution (see both histograms), it seems that the impact of imputing missing values has increase our peak, but it’s not affect negatively our predictions.
+
+Are there differences in activity patterns between weekdays and weekends?
